@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+
+    environment {
+
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        PROJECT_NAME = "chatting-backend"
+        PORT = "5001"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                echo "Clone Chatting App Backend from Main Branch"
+
+                git branch: 'main', url: 'https://github.com/safayetneyam/chatting-app-jenkins.git'
+
+                sh 'ls -lah'
+            }
+        }
+
+        stage('Preparing Database...') {
+            steps {
+                echo "Running the Database Container..."
+                sh "docker compose up mongo -d"
+                sleep(10)
+            }
+        }
+
+        stage('Preparing Configuration File...') {
+            steps {
+                dir('backend') {
+                    sh 'ls -lah'
+
+                    echo "🐳 Creating Project Configuration dynamically..."
+                    
+                    writeFile file: 'Dockerfile', text: """
+
+                        FROM node:20-alpine
+
+                        WORKDIR /app
+
+                        COPY package*.json ./
+                        RUN npm ci --omit=dev
+
+                        COPY src ./src
+
+                        ENV NODE_ENV=production
+                        EXPOSE ${env.PORT}
+
+                        CMD ["npm", "start"]
+
+                    """
+                }
+            }
+        }
+        stage('Building Docker Image...') {
+            steps {
+                dir('backend') {
+                    script {
+                        echo "🐳 Building Docker image with Jenkins Engine..."
+
+                        sh """
+                            # Checking Docker Version
+                            docker --version
+
+                            # Building Docker Image
+                            docker build -t ${env.PROJECT_NAME}:v${env.IMAGE_TAG} .
+                            echo "🐳 Docker image built successfully"
+
+                            docker images -a
+                        """
+                    }
+                }
+            }
+        }
+        stage('Running the Backend...') {
+            steps {
+                echo "Deleting previous running container..."
+                // sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
+                sh "docker ps -aq --filter 'name=^${env.PROJECT_NAME}-v' | xargs -r docker rm -f"
+                echo "❌ Container deleted successfully."
+
+                echo "🐳 Running the new backend container..."
+
+                sh "docker run -d -p 8082:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} --network chatting-app-jenkins_default --env-file .env -d --restart unless-stopped ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
+
+                sleep(10)
+            }
+        }
+        stage('Check our Backend Container running status log') {
+            steps {
+                sh "docker logs ${env.PROJECT_NAME}-v${env.IMAGE_TAG}"
+            }
+        }
+    }
+}

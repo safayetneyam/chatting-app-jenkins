@@ -1,0 +1,106 @@
+pipeline {
+    agent any
+
+    environment {
+
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        PROJECT_NAME = "chatting-frontend"
+        PORT = "4173"
+
+        // frontend
+        VITE_API_URL = "http://localhost:5001/api"
+        VITE_SOCKET_URL = "http://localhost:5001"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                echo "Clone Chatting App Frontend from Main Branch"
+
+                git branch: 'main', url: 'https://github.com/safayetneyam/chatting-app-jenkins.git'
+
+                sh 'ls -lah'
+            }
+        }
+        stage('Preparing Configuration File...') {
+            steps {
+                dir('frontend') {
+                    sh 'ls -lah'
+
+                    echo "🐳 Creating Project Configuration dynamically..."
+                    
+                    writeFile file: 'Dockerfile', text: """
+
+                        FROM node:20-alpine AS build
+
+                        WORKDIR /app
+
+                        ARG VITE_API_URL=http://localhost:5001/api
+                        ARG VITE_SOCKET_URL=http://localhost:5001
+                        ENV VITE_API_URL=$VITE_API_URL
+                        ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
+
+                        COPY package*.json ./
+                        RUN npm ci
+
+                        COPY . .
+
+                        RUN npm run build
+
+                        FROM nginx:1.27-alpine
+
+                        FROM node:20-alpine
+
+                        WORKDIR /app
+
+                        COPY --from=build /app/package.json ./package.json
+                        COPY --from=build /app/node_modules ./node_modules
+                        COPY --from=build /app/dist ./dist
+
+                        EXPOSE ${env.PORT}
+
+                        CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "${env.PORT}"]
+
+                    """
+                }
+            }
+        }
+        stage('Building Docker Image...') {
+            steps {
+                dir('frontend') {
+                    script {
+                        echo "🐳 Building Docker image with Jenkins Engine..."
+
+                        sh """
+                            # Checking Docker Version
+                            docker --version
+
+                            # Building Docker Image
+                            docker build -t ${env.PROJECT_NAME}:v${env.IMAGE_TAG} .
+                            echo "🐳 Docker image built successfully"
+
+                            docker images -a
+                        """
+                    }
+                }
+            }
+        }
+        stage('Running the Frontend...') {
+            steps {
+                echo "Deleting previous running container..."
+                // sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
+                sh "docker ps -aq --filter 'name=^${env.PROJECT_NAME}-v' | xargs -r docker rm -f"
+                echo "❌ Container deleted successfully."
+
+                echo "🐳 Running the new frontend container..."
+                sh "docker run -d -p 8081:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} --restart unless-stopped ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
+                sleep(10)
+            }
+        }
+        stage('Check our Frontend Container running status log') {
+            steps {
+                sh "docker logs ${env.PROJECT_NAME}-v${env.IMAGE_TAG}"
+            }
+        }
+    }
+}
