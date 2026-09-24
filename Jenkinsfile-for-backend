@@ -76,16 +76,22 @@ pipeline {
         }
         stage('Running the Backend...') {
             steps {
-                echo "Deleting previous running container..."
-                // sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
-                sh "docker ps -aq --filter 'name=^${env.PROJECT_NAME}-v' | xargs -r docker rm -f"
-                echo "❌ Container deleted successfully."
+                script {
+                    def networkName = sh(
+                        script: 'docker inspect "$(docker compose ps -q mongo)" --format \'{{range $name, $config := .NetworkSettings.Networks}}{{println $name}}{{end}}\'',
+                        returnStdout: true
+                    ).trim()
 
-                echo "🐳 Running the new backend container..."
+                    echo "Deleting previous running container..."
+                    // sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
+                    sh "docker ps -aq --filter 'name=^${env.PROJECT_NAME}-v' | xargs -r docker rm -f"
+                    echo "❌ Container deleted successfully."
 
-                sh "docker run -d -p 8082:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} --network chatting-app-jenkins_default --env-file .env -d --restart unless-stopped ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
+                    echo "🐳 Running the new backend container on network: ${networkName}"
+                    sh "docker run -d -p 8082:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} --network ${networkName} --env-file .env.temp --restart unless-stopped ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
 
-                sleep(10)
+                    sleep(10)
+                }
             }
         }
         stage('Check our Backend Container running status log') {
