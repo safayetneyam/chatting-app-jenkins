@@ -1,4 +1,4 @@
-## Manual Run
+## Manual Run Locally in Docker Engine
 
 curl.exe -o html.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
