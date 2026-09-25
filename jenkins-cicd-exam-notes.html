@@ -1,0 +1,127 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-left:22px}ul{list-style:disc}ol{list-style:decimal}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-left:2px solid var(--md-rule);padding-left:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:left;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<h1>CI/CD &amp; Jenkins — Exam Study Notes</h1>
+<h3>(Organized by the 10 official marking criteria — 5 marks each)</h3>
+<hr>
+<h2>1. CI/CD (5 marks)</h2>
+<ul>
+<li>CI/CD concept: why CI/CD is used, what benefit it provides, what problem it solves, and why it is necessary to integrate CI/CD into a project</li>
+</ul>
+<hr>
+<h2>2. Jenkins Functionality — Credentials, Role Management, Node/Multi-node, Webhook, Pipeline Structure (5 marks)</h2>
+<p><strong>Credentials / Secrets</strong></p>
+<ul>
+<li>How to give Jenkins permission (access control)</li>
+<li>How to create secrets</li>
+<li><strong>env — secret</strong>: using environment variables to hold secrets</li>
+<li><strong>Secret text token</strong>: storing a token as a &quot;Secret text&quot; credential</li>
+</ul>
+<p><strong>Role Management</strong></p>
+<ul>
+<li>How to create a user</li>
+<li>How to create a role</li>
+<li>How to change your profile password</li>
+</ul>
+<p><strong>Node / Multi-node</strong></p>
+<ul>
+<li>Basic node settings</li>
+<li>Number of executors — what it means and why you'd choose 1, 2, or 3</li>
+<li>How to add a multi-node (agent) setup</li>
+<li>Benefit of using multiple nodes</li>
+</ul>
+<p><strong>Webhook</strong></p>
+<ul>
+<li>How webhook works (triggers a Jenkins build automatically on a repo event, e.g. a Git push)</li>
+</ul>
+<p><strong>Pipeline Structure</strong></p>
+<ul>
+<li>What is a Pipeline job</li>
+<li>What is a Freestyle job</li>
+<li>Why use Pipeline over Freestyle</li>
+<li>Why use folders (to organize jobs)</li>
+<li>What &quot;duplicate&quot; (job) means and its benefit</li>
+<li>How to remotely access Jenkins using tokens:
+<ul>
+<li>Add a new API token from Security settings</li>
+<li>Used when another application needs to remotely trigger Jenkins builds</li>
+<li>Example: pass the Jenkins URL/domain to allow another application to remotely execute specific builds</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>3. Jenkins Installation (5 marks)</h2>
+<ul>
+<li>Plugin installation</li>
+<li>Tools settings — how to use them</li>
+<li>Security settings — how to use them</li>
+<li>Where to set up the email server (email configuration)</li>
+</ul>
+<hr>
+<h2>4. Jenkinsfile Syntax (5 marks)</h2>
+<ul>
+<li>Explain the syntax of a Jenkinsfile</li>
+</ul>
+<hr>
+<h2>5. Jenkinsfile vs Inline Syntax (5 marks)</h2>
+<ul>
+<li>Remote Jenkinsfile (stored on GitHub) vs inline script (written directly in the Jenkins job)</li>
+</ul>
+<hr>
+<h2>6. Shared Library (5 marks)</h2>
+<ul>
+<li>Structure: a <code>vars</code> folder containing <code>.groovy</code> files</li>
+<li>Each <code>.groovy</code> file defines a stage as a function, written in Groovy script</li>
+<li>These functions/scripts are then called from a Jenkinsfile</li>
+<li>Setup steps:
+<ul>
+<li>Go to shared library settings</li>
+<li>Set the library name</li>
+<li>Add the Git repo link</li>
+<li>The repo root must contain the <code>vars</code> folder</li>
+</ul>
+</li>
+<li>Reference: <a href="https://phoenixnap.com/kb/jenkins-shared-library">https://phoenixnap.com/kb/jenkins-shared-library</a></li>
+</ul>
+<hr>
+<h2>7. DevOps vs DevSecOps (5 marks)</h2>
+<ul>
+<li>Compare and explain the difference</li>
+</ul>
+<hr>
+<h2>8. Security Tools for DevSecOps — Open Source (5 marks)</h2>
+<ul>
+<li>List the names of well-known open source security tools used in DevSecOps</li>
+<li>Standard DevSecOps steps, in sequence, noting which stages depend on order and which don't:
+<ul>
+<li>Example: a Trivy scan of the <strong>built image</strong> must happen <em>after</em> the image is built</li>
+<li>Example: a Trivy scan of the <strong>overall filesystem</strong> does <em>not</em> necessarily need to happen after the image is built</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>9. Standard Implementation of a Jenkinsfile (5 marks)</h2>
+<ul>
+<li><strong>Mother block</strong>: the top-level <code>pipeline</code> block</li>
+<li><strong>Stages block hierarchy</strong>: how <code>stages</code> and <code>stage</code> are nested, and where the curly brackets go</li>
+<li><strong>Single-line command</strong>: using <code>sh 'command'</code></li>
+<li><strong>Multi-line command</strong>: using triple double-quotes <code>sh &quot;&quot;&quot; ... &quot;&quot;&quot;</code></li>
+<li><strong>Script block</strong>: used for multi-line/scripted logic (<code>script { ... }</code>)</li>
+<li><strong><code>def</code></strong>: how to define and use a function (<code>def</code>) inside a <code>script</code> block</li>
+</ul>
+<hr>
+<h2>10. Full End-to-End React Project Showcase (5 marks)</h2>
+<ul>
+<li>Demonstrate a complete end-to-end pipeline using the React project, including security stages</li>
+<li>Show that pipeline artifact files are generated</li>
+<li>Show that these artifact files are downloadable</li>
+</ul>
+<hr>
+<h2>Written Exam Format (Separate From the Practical Showcase)</h2>
+<ul>
+<li>12 MCQ — 12 marks</li>
+<li>6 short questions — 12 marks</li>
+<li>2 scenario-based questions (a pipeline code is given, answer questions based on it)</li>
+<li>DevSecOps-related questions</li>
+</ul>
+
+</body></html>
