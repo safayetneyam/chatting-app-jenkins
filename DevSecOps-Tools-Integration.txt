@@ -1,0 +1,70 @@
+## Install Brew Package Manager 
+ 
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+brew --version
+
+
+# Install Betterleaks via Brew package manager
+
+brew install betterleaks
+brew install betterleaks/tap/betterleaks
+
+
+
+# To install Semgrep with Brew
+
+brew install semgrep
+
+
+
+# Download trivy, templating, and configuring | Trivy
+# Source - https://stackoverflow.com/a/78982130
+# Posted by nealray, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-09-25, License - CC BY-SA 4.0
+
+brew install trivy
+
+wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+sudo cp html.tpl /usr/bin/html.tpl
+
+trivy image --format template --template "@/usr/bin/html.tpl" -o report.html {image}
+
+
+
+# Betterleaks not found with Jenkins user
+
+sudo rm /usr/local/bin/betterleaks5
+sudo ln -s /home/linuxbrew/.linuxbrew/bin/betterleaks /usr/local/bin/betterleaks
+sudo -u jenkins betterleaks --version
+
+
+
+# For Semgrep
+
+sudo ln -s /home/linuxbrew/.linuxbrew/bin/semgrep /usr/local/bin/semgrep
+sudo -u jenkins semgrep --version
+
+
+
+# For Trivy
+
+sudo ln -s /home/linuxbrew/.linuxbrew/bin/trivy /usr/local/bin/trivy
+sudo -u jenkins trivy --version
+
+
+
+# For Semgre Login with Github
+
+sudo -u jenkins semgrep login
+
+
+
+# NODE and NPM Install for Jenkins
+
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo -u jenkins node -v
+sudo -u jenkins npm -v
