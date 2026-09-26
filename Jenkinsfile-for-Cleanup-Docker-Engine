@@ -1,0 +1,109 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Check Docker') {
+            steps {
+                sh '''
+                    echo "Checking Docker..."
+                    docker --version
+                    docker info > /dev/null
+                '''
+            }
+        }
+
+        stage('Remove All Containers') {
+            steps {
+                sh '''
+                    echo "Removing all Docker containers..."
+
+                    CONTAINERS=$(docker ps -aq)
+
+                    if [ -n "$CONTAINERS" ]; then
+                        docker rm -f $CONTAINERS
+                    else
+                        echo "No containers found."
+                    fi
+                '''
+            }
+        }
+
+        stage('Remove All Images') {
+            steps {
+                sh '''
+                    echo "Removing all Docker images..."
+
+                    IMAGES=$(docker images -aq | sort -u)
+
+                    if [ -n "$IMAGES" ]; then
+                        docker rmi -f $IMAGES
+                    else
+                        echo "No images found."
+                    fi
+                '''
+            }
+        }
+
+        stage('Remove Custom Networks') {
+            steps {
+                sh '''
+                    echo "Removing user-created Docker networks..."
+
+                    docker network ls --format '{{.ID}} {{.Name}}' | \
+                    while read ID NAME; do
+                        case "$NAME" in
+                            bridge|host|none)
+                                echo "Keeping default network: $NAME"
+                                ;;
+                            *)
+                                echo "Removing network: $NAME"
+                                docker network rm "$ID" || true
+                                ;;
+                        esac
+                    done
+                '''
+            }
+        }
+
+        stage('Remove All Volumes') {
+            steps {
+                sh '''
+                    echo "Removing all Docker volumes..."
+
+                    VOLUMES=$(docker volume ls -q)
+
+                    if [ -n "$VOLUMES" ]; then
+                        docker volume rm -f $VOLUMES
+                    else
+                        echo "No volumes found."
+                    fi
+                '''
+            }
+        }
+
+        stage('Verify Cleanup') {
+            steps {
+                sh '''
+                    echo "================================"
+                    echo "Remaining Containers:"
+                    docker ps -a
+
+                    echo "================================"
+                    echo "Remaining Images:"
+                    docker images
+
+                    echo "================================"
+                    echo "Remaining Networks:"
+                    docker network ls
+
+                    echo "================================"
+                    echo "Remaining Volumes:"
+                    docker volume ls
+
+                    echo "================================"
+                '''
+            }
+        }
+    }
+}

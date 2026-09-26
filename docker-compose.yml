@@ -45,6 +45,5 @@ services:
       - "8085:8025" # web UI
       - "8086:1025" # SMTP, compose/jenkins network only and In Manage Jenkins → System → Extended E-mail Notification and another email configuration section if needed
   
-
 volumes:
   mongo_data:
