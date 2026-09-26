@@ -1,0 +1,203 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        PREVIOUS_TAG = "${env.BUILD_NUMBER.toInteger() - 1}"
+        PROJECT_NAME = "chatting-frontend"
+        PORT = "4173"
+        ALERT_EMAIL = 'neyam@bjit.com'
+
+        // frontend
+        VITE_API_URL = "http://localhost:8082/api"
+        VITE_SOCKET_URL = "http://localhost:8082"
+    }
+ 
+    stages {
+        stage('Clone Repository') {
+            steps {
+                // echo "Triggered by: ${env.ref}"
+ 
+                echo "Clone Chatting App Frontend from Main Branch"
+
+                git branch: 'main', url: 'https://github.com/safayetneyam/chatting-app-jenkins.git'
+
+                sh 'ls -lah'
+            }
+        }
+        stage('Running Email Container - Mailpit...') {
+            steps {
+                echo "Running the Email Container..."
+                sh "docker compose up platform-mailpit -d"
+            }
+        }
+        stage('prepare configuration file') {
+            steps {
+                dir('frontend') {
+                    sh 'ls -lah'
+ 
+                    echo "📝 Creating Project Configuration dynamically..."
+ 
+                    writeFile file: 'Dockerfile', text: """
+                        
+                        FROM node:20-alpine AS build
+
+                        WORKDIR /app
+
+                        ARG VITE_API_URL=http://localhost:5001/api
+                        ARG VITE_SOCKET_URL=http://localhost:5001
+                        ENV VITE_API_URL=$VITE_API_URL
+                        ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
+
+                        COPY package*.json ./
+                        RUN npm ci
+
+                        COPY . .
+
+                        RUN npm run build
+
+                        FROM nginx:1.27-alpine
+
+                        FROM node:20-alpine
+
+                        WORKDIR /app
+
+                        COPY --from=build /app/package.json ./package.json
+                        COPY --from=build /app/node_modules ./node_modules
+                        COPY --from=build /app/dist ./dist
+
+                        EXPOSE ${env.PORT}
+
+                        CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "${env.PORT}"]                        
+ 
+                    """
+                }
+            }
+        }
+        stage('Secrets detection...') {
+            steps {
+                dir('frontend') {
+                    script {
+
+                        def rc = sh(script: 'betterleaks dir . --report-path betterleaks.json --report-format json', returnStatus: true)
+                        if (rc != 0) {
+                            unstable("betterleaks found potential secrets (exit ${rc})")
+                        }
+ 
+                        archiveArtifacts artifacts: 'betterleaks.*', fingerprint: true
+ 
+                    }
+                }
+            }
+        }
+        stage('SAST Scanning...') {
+            steps {
+                dir('frontend') {
+                    sh "semgrep scan --config auto --json --output=semgrep.json"
+ 
+                    archiveArtifacts artifacts: 'semgrep.*', fingerprint: true
+                }
+            }
+        }
+        stage('Trivy FS Scan...') {
+            steps {
+                dir('frontend') {
+                    sh '''
+                        trivy fs . \\
+                            --scanners vuln,misconfig,secret \\
+                            --skip-files 'betterleaks.json,semgrep.json,.pkgjson.md5' \\
+                            --format json -o trivy-fs-report.json
+ 
+                        trivy convert \\
+                            --format template --template "@/usr/bin/html.tpl" \\
+                            -o trivy-fs-report.html trivy-fs-report.json
+                    '''
+ 
+                    archiveArtifacts artifacts: 'trivy-fs-report.*', fingerprint: true
+                }
+            }
+        }
+        stage('Build Docker Image...') {
+            steps {
+                dir('frontend') {
+                    script {
+                        echo "🔨 Building Docker image with Buildx..."
+ 
+                        sh """
+                            # Ensure buildx is available
+                            docker --version
+ 
+                            docker build -t ${env.PROJECT_NAME}:v${env.IMAGE_TAG} .
+ 
+                            echo "✅ Docker image built successfully"
+ 
+                            docker images -a
+                        """
+                    }
+                }
+            }
+        }
+        stage('Trivy Image Scan...') {
+            steps {
+                dir('frontend') {
+ 
+                    sh '''
+                        trivy image \\
+                            --scanners vuln,misconfig,secret \\
+                            --skip-files '**/betterleaks.json,**/semgrep.json' \\
+                            --format json -o trivy-image-report.json "${PROJECT_NAME}:v${IMAGE_TAG}"
+ 
+                        trivy convert \\
+                            --format template --template "@/usr/bin/html.tpl" \\
+                            -o trivy-image-report.html trivy-image-report.json
+ 
+                    '''
+ 
+                    archiveArtifacts artifacts: 'trivy-image-report.*', fingerprint: true
+                }
+            }
+        }
+        stage('Run our Frontend') {
+            steps {
+                echo "Deleting previous running container -- ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
+                sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
+                sh "docker run -d -p 8081:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
+                sleep(10)
+            }
+        }
+        stage('Check our Frontend Container running status log') {
+            steps {
+                sh "docker logs ${env.PROJECT_NAME}-v${env.IMAGE_TAG}"
+            }
+        }
+    }
+ 
+    post {
+        success {
+            echo "🎉 Deployment successful! I am from success block"
+        }
+ 
+        failure {
+            echo "❌ Deployment failed! I am from failure block"
+ 
+            // emailext(
+            //     to: "${ALERT_EMAIL}",
+            //     subject: "Jenkins Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            //     mimeType: 'text/html',
+            //     body: """
+            //         <p>Build <b>${env.JOB_NAME} #${env.BUILD_NUMBER}</b> failed.</p>
+            //         <p>Console: <a href="${env.BUILD_URL}console">${env.BUILD_URL}console</a></p>
+            //         <p>The full console log is attached.</p>
+            //     """,
+            //     attachLog: true,     // attaches build.log
+            //     compressLog: false   // plain text, not .gz
+            // )
+        }
+ 
+        always {
+            echo "🎉 Hey! I am always block"
+            // sh "rm -f ${APP_NAME}-${IMAGE_TAG}.tar || true"
+            // cleanWs()
+        }
+    }
+}
