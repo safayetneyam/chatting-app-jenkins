@@ -1,0 +1,38 @@
+post {
+    always {
+        echo "🔁 Pipeline finished with status: ${currentBuild.currentResult}"
+        // Optional: clean the workspace after every run
+        // cleanWs()
+    }
+
+    success {
+        echo "✅ Deployment successful! I am from success block"
+
+        emailext(
+            to: "${env.ALERT_EMAIL}",
+            subject: "Jenkins Build SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            mimeType: 'text/html',
+            body: """
+                <p>Build <b>${env.JOB_NAME} #${env.BUILD_NUMBER}</b> succeeded.</p>
+                <p>Details: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+            """
+        )
+    }
+
+    failure {
+        echo "❌ Deployment failed! I am from failure block"
+
+        emailext(
+            to: "${env.ALERT_EMAIL}",
+            subject: "Jenkins Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            mimeType: 'text/html',
+            body: """
+                <p>Build <b>${env.JOB_NAME} #${env.BUILD_NUMBER}</b> failed.</p>
+                <p>Console: <a href="${env.BUILD_URL}console">${env.BUILD_URL}console</a></p>
+                <p>The full console log is attached.</p>
+            """,
+            attachLog: true,     // attaches build.log
+            compressLog: false   // plain text, not .gz
+        )
+    }
+}
