@@ -1,0 +1,224 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        PROJECT_NAME = "chatting-backend"
+        PORT = "5001"
+        ALERT_EMAIL = 'neyam@bjit.com'
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                // echo "Triggered by: ${env.ref}"
+ 
+                echo "Clone Chatting App Frontend from Main Branch"
+
+                git branch: 'main', url: 'https://github.com/safayetneyam/chatting-app-jenkins.git'
+
+                sh 'ls -lah'
+            }
+        }
+        // stage('Running Email Container - Mailpit...') {
+        //     steps {
+        //         echo "Running the Email Container..."
+        //         sh "docker compose up platform-mailpit -d"
+        //     }
+        // }
+        stage('Running Email Container - Mailpit...') {
+            steps {
+                echo "Ensuring Mailpit is running..."
+                sh '''
+                    if docker inspect platform-mailpit >/dev/null 2>&1; then
+                        echo "Mailpit container already exists. Skipping creation."
+
+                        if [ "$(docker inspect -f '{{.State.Running}}' platform-mailpit)" != "true" ]; then
+                            echo "Mailpit is stopped. Starting it..."
+                            docker start platform-mailpit
+                        fi
+                    else
+                        echo "Mailpit does not exist. Creating it..."
+                        docker compose up platform-mailpit -d
+                    fi
+                '''
+            }
+        }
+        stage('prepare configuration file') {
+            steps {
+                dir('backend') {
+                    sh 'ls -lah'
+ 
+                    echo "📝 Creating Project Configuration dynamically..."
+ 
+                    writeFile file: 'Dockerfile', text: """
+                        
+                        FROM node:20-alpine
+
+                        WORKDIR /app
+
+                        COPY package*.json ./
+                        RUN npm ci --omit=dev
+
+                        COPY src ./src
+
+                        ENV NODE_ENV=production
+                        EXPOSE ${env.PORT}
+
+                        CMD ["npm", "start"]                       
+ 
+                    """
+                }
+            }
+        }
+        stage('Secrets detection...') {
+            steps {
+                dir('backend') {
+                    script {
+
+                        def rc = sh(script: 'betterleaks dir . --report-path betterleaks-backend.json --report-format json', returnStatus: true)
+                        if (rc != 0) {
+                            unstable("betterleaks found potential secrets (exit ${rc})")
+                        }
+ 
+                        archiveArtifacts artifacts: 'betterleaks-backend.*', fingerprint: true
+ 
+                    }
+                }
+            }
+        }
+        stage('SAST Scanning...') {
+            steps {
+                dir('backend') {
+                    sh "semgrep scan --config auto --json --output=semgrep-backend.json"
+ 
+                    archiveArtifacts artifacts: 'semgrep-backend.*', fingerprint: true
+                }
+            }
+        }
+
+        // Trivy takes too much time to scan the backend filesystem.
+        // vuln DB is huge! timeout error. so, i've skipped it. 
+        // --scanners vuln,misconfig,secret
+
+        stage('Trivy FS Scan...') {
+            steps {
+                dir('backend') {
+                    sh '''
+                        trivy fs . \\
+                            --scanners misconfig,secret \\
+                            --skip-files 'betterleaks-backend.json,semgrep-backend.json,.pkgjson.md5' \\
+                            --format json -o trivy-fs-report-backend.json
+ 
+                        trivy convert \\
+                            --format template --template "@/usr/bin/html.tpl" \\
+                            -o trivy-fs-report-backend.html trivy-fs-report-backend.json
+                    '''
+ 
+                    archiveArtifacts artifacts: 'trivy-fs-report-backend.*', fingerprint: true
+                }
+            }
+        }
+
+        stage('Build Docker Image...') {
+            steps {
+                dir('backend') {
+                    script {
+                        echo "🔨 Building Docker image with Buildx..."
+ 
+                        sh """
+                            # Ensure buildx is available
+                            docker --version
+ 
+                            docker build -t ${env.PROJECT_NAME}:v${env.IMAGE_TAG} .
+                            echo "🐳 Docker image built successfully"
+
+                            docker images -a
+                        """
+                    }
+                }
+            }
+        }
+        stage('Trivy Image Scan...') {
+            steps {
+                dir('backend') {
+ 
+                    sh '''
+                        trivy image \\
+                            --scanners misconfig,secret \\
+                            --skip-files '**/betterleaks-backend.json,**/semgrep-backend.json' \\
+                            --format json -o trivy-image-report-backend.json "${PROJECT_NAME}:v${IMAGE_TAG}"
+ 
+                        trivy convert \\
+                            --format template --template "@/usr/bin/html.tpl" \\
+                            -o trivy-image-report-backend.html trivy-image-report-backend.json
+ 
+                    '''
+ 
+                    archiveArtifacts artifacts: 'trivy-image-report-backend.*', fingerprint: true
+                }
+            }
+        }
+        stage('Preparing Database...') {
+            steps {
+                echo "Running the Database Container..."
+                sh "docker compose up mongo -d"
+                sleep(10)
+            }
+        }
+        stage('Running the Backend...') {
+            steps {
+                script {
+                    def networkName = sh(
+                        script: 'docker inspect "$(docker compose ps -q mongo)" --format \'{{range $name, $config := .NetworkSettings.Networks}}{{println $name}}{{end}}\'',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Deleting previous running container..."
+                    // sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
+                    sh "docker ps -aq --filter 'name=^${env.PROJECT_NAME}-v' | xargs -r docker rm -f"
+                    echo "❌ Container deleted successfully."
+
+                    echo "🐳 Running the new backend container on network: ${networkName}"
+                    sh "docker run -d -p 8082:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} --network ${networkName} --env-file .env.temp --restart unless-stopped ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
+
+                    sleep(10)
+                }
+            }
+        }
+        stage('Check our Backend Container running status log') {
+            steps {
+                sh "docker logs ${env.PROJECT_NAME}-v${env.IMAGE_TAG}"
+            }
+        }
+    }
+ 
+    post {
+        success {
+            echo "🎉 Deployment successful! I am from success block"
+        }
+ 
+        failure {
+            echo "❌ Deployment failed! I am from failure block"
+ 
+            emailext(
+                to: "${ALERT_EMAIL}",
+                subject: "Jenkins Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
+                    <p>Build <b>${env.JOB_NAME} #${env.BUILD_NUMBER}</b> failed.</p>
+                    <p>Console: <a href="${env.BUILD_URL}console">${env.BUILD_URL}console</a></p>
+                    <p>The full console log is attached.</p>
+                """,
+                attachLog: true,     // attaches build.log
+                compressLog: false   // plain text, not .gz
+            )
+        }
+ 
+        always {
+            echo "🎉 Hey! I am always block"
+            // sh "rm -f ${APP_NAME}-${IMAGE_TAG}.tar || true"
+            // cleanWs()
+        }
+    }
+}

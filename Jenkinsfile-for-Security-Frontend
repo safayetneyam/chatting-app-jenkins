@@ -3,16 +3,16 @@ pipeline {
 
     environment {
         IMAGE_TAG = "${env.BUILD_NUMBER}"
-        PREVIOUS_TAG = "${env.BUILD_NUMBER.toInteger() - 1}"
         PROJECT_NAME = "chatting-frontend"
         PORT = "4173"
+        
         ALERT_EMAIL = 'neyam@bjit.com'
 
         // frontend
         VITE_API_URL = "http://localhost:8082/api"
         VITE_SOCKET_URL = "http://localhost:8082"
     }
- 
+
     stages {
         stage('Clone Repository') {
             steps {
@@ -25,10 +25,28 @@ pipeline {
                 sh 'ls -lah'
             }
         }
+        // stage('Running Email Container - Mailpit...') {
+        //     steps {
+        //         echo "Running the Email Container..."
+        //         sh "docker compose up platform-mailpit -d"
+        //     }
+        // }
         stage('Running Email Container - Mailpit...') {
             steps {
-                echo "Running the Email Container..."
-                sh "docker compose up platform-mailpit -d"
+                echo "Ensuring Mailpit is running..."
+                sh '''
+                    if docker inspect platform-mailpit >/dev/null 2>&1; then
+                        echo "Mailpit container already exists. Skipping creation."
+
+                        if [ "$(docker inspect -f '{{.State.Running}}' platform-mailpit)" != "true" ]; then
+                            echo "Mailpit is stopped. Starting it..."
+                            docker start platform-mailpit
+                        fi
+                    else
+                        echo "Mailpit does not exist. Creating it..."
+                        docker compose up platform-mailpit -d
+                    fi
+                '''
             }
         }
         stage('prepare configuration file') {
@@ -157,11 +175,15 @@ pipeline {
                 }
             }
         }
-        stage('Run our Frontend') {
+        stage('Running the Frontend...') {
             steps {
-                echo "Deleting previous running container -- ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
-                sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
-                sh "docker run -d -p 8081:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
+                echo "Deleting previous running container..."
+                // sh "docker rm -f ${env.PROJECT_NAME}-v${env.PREVIOUS_TAG}"
+                sh "docker ps -aq --filter 'name=^${env.PROJECT_NAME}-v' | xargs -r docker rm -f"
+                echo "❌ Container deleted successfully."
+
+                echo "🐳 Running the new frontend container..."
+                sh "docker run -d -p 8081:${env.PORT} --name ${env.PROJECT_NAME}-v${env.IMAGE_TAG} --restart unless-stopped ${env.PROJECT_NAME}:v${env.IMAGE_TAG}"
                 sleep(10)
             }
         }
@@ -175,6 +197,31 @@ pipeline {
     post {
         success {
             echo "🎉 Deployment successful! I am from success block"
+
+            sh """
+                zip -j ${PROJECT_NAME}-v${IMAGE_TAG}-security-reports.zip \
+                    frontend/betterleaks.json \
+                    frontend/semgrep.json \
+                    frontend/trivy*
+            """
+
+            archiveArtifacts(
+                artifacts: "${PROJECT_NAME}-v${IMAGE_TAG}-security-reports.zip",
+                fingerprint: true
+            )
+
+            emailext(
+                to: "${ALERT_EMAIL}",
+                subject: "Jenkins Build SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
+                    <p>Build <b>${env.JOB_NAME} #${env.BUILD_NUMBER}</b> completed successfully.</p>
+                    <p>The security scan reports and full console log are attached.</p>
+                """,
+                attachmentsPattern: "${PROJECT_NAME}-v${IMAGE_TAG}-security-reports.zip",
+                attachLog: true,
+                compressLog: false
+            )
         }
  
         failure {

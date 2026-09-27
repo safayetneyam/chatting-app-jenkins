@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-
         IMAGE_TAG = "${env.BUILD_NUMBER}"
         PROJECT_NAME = "chatting-frontend"
         PORT = "4173"
