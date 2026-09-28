@@ -200,15 +200,15 @@ pipeline {
 
             sh """
                 zip -j ${PROJECT_NAME}-v${IMAGE_TAG}-security-reports.zip \
-                    frontend/betterleaks.json \
-                    frontend/semgrep.json \
+                    frontend/better* \
+                    frontend/semgrep* \
                     frontend/trivy*
             """
 
             archiveArtifacts(
                 artifacts: "${PROJECT_NAME}-v${IMAGE_TAG}-security-reports.zip",
                 fingerprint: true
-            )
+            ) 
 
             emailext(
                 to: "${ALERT_EMAIL}",
